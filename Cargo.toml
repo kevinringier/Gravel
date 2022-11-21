@@ -1,5 +1,5 @@
 [package]
-name = "database-rust"
+name = "gravel"
 version = "0.1.0"
 edition = "2021"
 
