@@ -1,4 +1,4 @@
-struct Node<const MAX_HEIGHT: usize> {
+pub struct Node<const MAX_HEIGHT: usize> {
 	key_offset: u32,
 	key_size: u32,
 	value_size: u32,
@@ -8,13 +8,42 @@ struct Node<const MAX_HEIGHT: usize> {
 
 impl<const MAX_HEIGHT: usize> Node<MAX_HEIGHT> {
 	fn new() -> Node<MAX_HEIGHT> {
-		Node {
-			key_offset: 1,
-			key_size: 1,
-			value_size: 1,
-			alloc_size: 1,
-			tower: [Links{next_offset: 1, prev_offset: 5}; MAX_HEIGHT]
-		}
+		// Node {
+		// 	key_offset: 1,
+		// 	key_size: 1,
+		// 	value_size: 1,
+		// 	alloc_size: 1,
+		// 	tower: [Links{next_offset: 1, prev_offset: 5}; MAX_HEIGHT]
+		// }
+		todo!()
+	}
+
+	/// MaxNodeSize returns the maximum space needed for a node with the specified
+	/// key and value sizes. This could overflow a uint32, which is why a uint64
+	/// is used here. If a key/value overflows a uint32, it should not be added to
+	/// the skiplist.
+	pub fn max_node_size(key_size: u32, value_size: u32) -> u64 {
+		todo!()
+	}
+
+	fn new_raw_node() {
+		todo!()
+	}
+
+	fn next_offset(h: isize) {
+		todo!()
+	}
+
+	fn prev_offset(h: isize) {
+		todo!()
+	}
+
+	fn cas_next_offset(self, h: isize, old: u32, val: u32) {
+		todo!()
+	}
+
+	fn cas_prev_offset(self, h: isize, old: u32, val: u32) {
+		todo!()
 	}
 }
 

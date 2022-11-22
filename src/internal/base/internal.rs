@@ -9,3 +9,6 @@ pub struct InternalKey {
 	user_key: Vec<u8>,
 	trailer: u64,
 }
+
+// TODO implement key encoder/decoder
+//https://serde.rs/
