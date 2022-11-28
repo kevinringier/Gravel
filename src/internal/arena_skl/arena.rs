@@ -104,7 +104,7 @@ impl ArenaInner {
 	/// remaining_bytes returns the number of remaining bytes in the arena
 	fn remaining_bytes(&self) -> usize {
 		//TODO understand atomic lock ordering https://en.cppreference.com/w/cpp/atomic/memory_order#Release-Acquire_ordering
-		self.remaining_bytes.load(Ordering::Aquire)
+		self.remaining_bytes.load(Ordering::Acquire)
 	}
 
 	/// sub_remaining_bytes subtracts bytes from this arena's remaining bytes
@@ -179,7 +179,7 @@ pub trait Arena {
 	/// Returns an estimate of the total memory usage of data allocated by the arena.
 	fn memory_usage(&self) -> usize;
 
-	fn remain_bytes(&self) -> usize;
+	fn remaining_bytes(&self) -> usize;
 }
 
 impl Default for ArenaImpl {
@@ -214,6 +214,13 @@ impl Arena for ArenaImpl {
 		//     be up to the user to allocate a new arena and likely
 		//     trigger compaction on this arena.
 		self.inner.alloc_fallback(bytes)
+	}
+
+	// The semantics of what to return are messy if we allow 0-byte
+	// allocations, so we disallow them. We don't need them for our 
+	// internal use.
+	fn allocate(&self, bytes: usize) -> &mut [u8] {
+		unsafe { slice::from_raw_parts_mut(self.alloc(bytes), bytes) }
 	}
 
 	fn allocate_aligned(&self, bytes: usize) -> &mut [u8] {
@@ -263,5 +270,28 @@ impl Arena for ArenaImpl {
 		// forms a slice over the backing arena where the pointer is aligned and 
 		// the length is the number of bytes.
 		unsafe { slice::from_raw_parts_mut(result, bytes) }
+	}
+
+	fn memory_usage(&self) -> usize {
+		self.inner.memory_usage()
+	}
+
+	fn remaining_bytes(&self) -> usize {
+	    self.inner.remaining_bytes()
+	}
+}
+
+// cfg(test) is a compiler configuration that tells the rust compiler to only
+// compile the tests if compiled in test mode
+#[cfg(test)]
+mod tests {
+	use crate::internal::arena_skl::arena::{Arena, ArenaImpl};
+
+	#[test]
+	fn test_alloc() {
+		let arena = ArenaImpl::new();
+
+		let _ = arena.allocate_aligned(104);
+		assert_eq!(arena.memory_usage(), 4104);
 	}
 }

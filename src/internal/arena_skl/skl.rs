@@ -5,7 +5,7 @@ use crate::internal::base::internal::InternalKey;
 const MAX_HEIGHT: usize = 20;
 
 struct ArenaSkipList {
-	arena: Arena,
+	//arena: Arena,
 	head: Node<MAX_HEIGHT>,
 	tail: Node<MAX_HEIGHT>,
 	height: u32, // Current height. 1 <= height <= MAX_HEIGHT.
@@ -27,13 +27,13 @@ impl ArenaSkipList {
 
 impl ArenaSkipList {
 	// This set of methods were taken from node.go in arenaskl. I thought they made more sense to be in the skiplist implementation
-	fn get_key_bytes(self, arena: &Arena, node: &Node) {
-		todo!()
-	}
+	// fn get_key_bytes(self, arena: &Arena, node: &Node) {
+	// 	todo!()
+	// }
 
-	fn get_value(self, arena: &Arena, node: &Node) {
-		todo!()
-	}
+	// fn get_value(self, arena: &Arena, node: &Node) {
+	// 	todo!()
+	// }
 
 	
 }
