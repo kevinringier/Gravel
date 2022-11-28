@@ -159,3 +159,109 @@ impl ArenaInner {
         self.memory_usage.load(Ordering::Acquire)
     }
 }
+
+#[derive(Clone)]
+pub struct ArenaImpl {
+	inner: Arc<ArenaInner>,
+}
+
+pub trait Arena {
+	/// Return a pointer to a newly allocated memory block of "bytes"
+	fn alloc(&self, bytes: usize) -> *mut u8;
+
+	/// Allocate slice with specific length.
+	fn allocate(&self, bytes: usize) -> &mut [u8];
+
+	/// Allocate memory with normal alignment guarantees provided by malloc
+	// KR: what is aligned - https://stackoverflow.com/questions/3994035/what-is-aligned-memory-allocation
+	fn allocate_aligned(&self, bytes: usize) -> &mut [u8];
+
+	/// Returns an estimate of the total memory usage of data allocated by the arena.
+	fn memory_usage(&self) -> usize;
+
+	fn remain_bytes(&self) -> usize;
+}
+
+impl Default for ArenaImpl {
+	fn default() -> Self {
+		Self {
+			inner: Arc::new(ArenaInner::new()),
+		}
+	}
+}
+
+impl ArenaImpl {
+	pub fn new() -> Self {
+		Self::default()
+	}
+}
+
+impl Arena for ArenaImpl {
+	fn alloc(&self, bytes: usize) -> *mut u8 {
+		// KR: is it possible to encode this in a type?
+		assert!(bytes > 0);
+
+		if bytes <= self.inner.remaining_bytes() {
+			assert!(!self.inner.alloc_ptr().is_null());
+			let result = self.inner.alloc_ptr();
+			self.inner.add_alloc_ptr(bytes);
+			self.inner.sub_remaining_bytes(bytes);
+			return result;
+		}
+
+		// KR: We are using one memory chung per arena. We should
+		// 	   indicate to the user the arena is full and it will
+		//     be up to the user to allocate a new arena and likely
+		//     trigger compaction on this arena.
+		self.inner.alloc_fallback(bytes)
+	}
+
+	fn allocate_aligned(&self, bytes: usize) -> &mut [u8] {
+		let ptr_size = mem::size_of::<usize>();
+		let align = if ptr_size > 8 { ptr_size } else { 8 };
+
+		// https://medium.com/howsofcoding/memory-management-aligned-malloc-and-free-9273336bd4c6
+		// current_mod is calculating how many bytes are we away from multiple of align.
+		// for example if align is 8 (1000) and our pointer is on 9 (1001), we are 1 byte
+		// past a multiple of 8. we calculate that by subtracting 1 from our align, i.e.
+		// 8 - 1 = 7 (0111) and performing bitwise AND with our pointer to determine which
+		// bits are set that are less than align. Align is the multiple of our data, which
+		// are bytes in this case. Bitwise AND ((0111) & (1001)) = (0001), or 1 which tells 
+		// us we are 1 byte past a multiple of our align.  
+		let current_mod = self.inner.alloc_ptr() as usize & (align - 1);
+		let slop = if current_mod == 0 {
+			// we are already on a multiple of align
+			0
+		} else {
+			// calculate how many bytes we need to push pointer by subtracting align from 
+			// how many bytes past a multiple of align we are.
+			align - current_mod
+		};
+
+		let needed = bytes + slop; // Since we calculate the align on insertion, we leave 
+		// ptr unaligned after insertion
+		let result = if needed <= self.inner.remaining_bytes() {
+			unsafe {
+				// calculate the offset where an entry will be allocated
+				let p = self.inner.alloc_ptr().add(slop);
+				// push this arena's ptr to past the previously allocated bytes
+				self.inner.add_alloc_ptr(needed);
+				// update the number of bytes remaining in the arena.
+				self.inner.sub_remaining_bytes(needed);
+				p
+			}
+		} else {
+			// Allocate fallback always returns aligned memory
+			// KR: we will return an AllocateAlignedResult type that indicates
+			//     if the arena is full to the user, or returns a value, or 
+			//     other types if needed. We won't fallback for user and we won't
+			//     return untyped values that intend to mean something.
+			self.inner.alloc_fallback(bytes)
+		};
+		// assert that the result is aligned
+		assert_eq!(result as usize & (align - 1), 0);
+		// forms a slice over the backing arena where the pointer is aligned and 
+		// the length is the number of bytes.
+		unsafe { slice::from_raw_parts_mut(result, bytes) }
+	}
+}
